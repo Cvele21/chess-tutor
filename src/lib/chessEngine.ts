@@ -26,8 +26,9 @@ class ChessEngine {
       try {
         // Create worker from public folder
         // In Vite, files in public are served from root
-        // Use new URL to ensure proper path resolution
-        const workerUrl = new URL('/stockfish.js', window.location.origin);
+        // Use simple string path - Vite handles this correctly in both dev and production
+        const workerUrl = '/stockfish.js';
+        
         this.worker = new Worker(workerUrl, { type: 'module' });
 
         this.worker.onmessage = (event) => {

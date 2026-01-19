@@ -32,7 +32,7 @@ function App() {
   // Initialize engine on mount
   useEffect(() => {
     let mounted = true;
-    let restartInterval: NodeJS.Timeout | null = null;
+    let restartInterval = null;
 
     initializeEngine()
       .then(() => {
