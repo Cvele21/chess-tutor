@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
-import { useStockfish } from './hooks/useStockfish';
+import { initializeEngine, getEvaluation, destroyEngine, restartEngine } from './lib/chessEngine';
 import TutorFeedback from './components/TutorFeedback';
 import CoachComments from './components/CoachComments';
+import BlunderPopup from './components/BlunderPopup';
+import EvaluationBar from './components/EvaluationBar';
 import { uciToMove, moveToUci, getArrowColor } from './utils/chessUtils';
 import { generateCoachComment } from './utils/coachComments';
 import { findAttackedPieces } from './utils/threatAnalysis';
@@ -13,22 +15,92 @@ function App() {
   const [game, setGame] = useState(new Chess());
   const [boardOrientation, setBoardOrientation] = useState('white');
   const [arrows, setArrows] = useState([]);
+  const [hintArrow, setHintArrow] = useState(null);
   const [customSquareStyles, setCustomSquareStyles] = useState({});
   const [coachComment, setCoachComment] = useState(null);
   const [threatMode, setThreatMode] = useState(false);
+  const [showBlunderPopup, setShowBlunderPopup] = useState(false);
+  
+  const [evaluation, setEvaluation] = useState(null);
+  const [bestMoves, setBestMoves] = useState([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [engineReady, setEngineReady] = useState(false);
   
   const previousEvalRef = useRef(null);
   const previousGameRef = useRef(null);
 
-  const { evaluation, bestMoves, isAnalyzing, evaluatePosition } = useStockfish();
-
-  // Evaluate position whenever game state changes
+  // Initialize engine on mount
   useEffect(() => {
-    const fen = game.fen();
-    evaluatePosition(fen, 15);
-  }, [game, evaluatePosition]);
+    let mounted = true;
+    let restartInterval: NodeJS.Timeout | null = null;
 
-  // Track evaluation changes and generate coach comments
+    initializeEngine()
+      .then(() => {
+        if (mounted) {
+          setEngineReady(true);
+          console.log('Chess engine initialized');
+          
+          // Restart worker every 30 minutes to prevent memory leaks in long sessions
+          restartInterval = setInterval(async () => {
+            try {
+              console.log('Restarting chess engine to prevent memory leaks...');
+              await restartEngine();
+              console.log('Chess engine restarted successfully');
+            } catch (error) {
+              console.error('Failed to restart chess engine:', error);
+            }
+          }, 30 * 60 * 1000); // 30 minutes
+        }
+      })
+      .catch((error) => {
+        if (mounted) {
+          console.error('Failed to initialize chess engine:', error);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      if (restartInterval) {
+        clearInterval(restartInterval);
+      }
+      // Cleanup worker on unmount
+      destroyEngine();
+    };
+  }, []);
+
+  // Automatically evaluate position whenever game state changes
+  useEffect(() => {
+    if (!engineReady) return;
+
+    const fen = game.fen();
+    setIsAnalyzing(true);
+    setBestMoves([]);
+
+    let cancelled = false;
+
+    getEvaluation(fen, 15)
+      .then((result) => {
+        if (!cancelled) {
+          setEvaluation(result.score);
+          if (result.bestMove) {
+            setBestMoves([{ move: result.bestMove, score: result.score, index: 0 }]);
+          }
+          setIsAnalyzing(false);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error('Evaluation error:', error);
+          setIsAnalyzing(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [game, engineReady]);
+
+  // Track evaluation changes and generate coach comments + blunder detection
   useEffect(() => {
     // Only process when evaluation is stable (not analyzing)
     if (!isAnalyzing && evaluation !== null) {
@@ -39,6 +111,18 @@ function App() {
       // If game changed and we have a previous evaluation, generate comment
       if (gameChanged && previousEvalRef.current !== null) {
         const evaluationChange = evaluation - previousEvalRef.current;
+        
+        // Blunder detection: Check if score dropped by more than 1.5 pawns (150 centipawns)
+        const isWhiteTurn = previousGameRef.current.turn() === 'w';
+        const justMoved = isWhiteTurn ? 'white' : 'black';
+        const perspective = justMoved === 'white' ? 1 : -1;
+        const adjustedChange = evaluationChange * perspective;
+        
+        // If score dropped by more than 1.5 pawns (150 centipawns), show blunder popup
+        if (adjustedChange < -150) {
+          setShowBlunderPopup(true);
+        }
+        
         const comment = generateCoachComment(
           evaluationChange,
           previousEvalRef.current,
@@ -106,6 +190,7 @@ function App() {
 
       setGame(gameCopy);
       setArrows([]); // Clear arrows after move
+      setHintArrow(null); // Clear hint arrow after move
       return true;
     } catch (error) {
       console.error('Move error:', error);
@@ -142,12 +227,36 @@ function App() {
     setArrows([]);
   }, []);
 
+  // Show hint (best move arrow)
+  const showHint = useCallback(() => {
+    if (bestMoves && bestMoves.length > 0 && bestMoves[0]?.move) {
+      const bestMove = bestMoves[0].move;
+      if (bestMove.length >= 4) {
+        const from = bestMove.substring(0, 2);
+        const to = bestMove.substring(2, 4);
+        
+        setHintArrow({
+          from,
+          to,
+          color: 'rgba(74, 222, 128, 0.6)' // Semi-transparent green
+        });
+        
+        // Clear hint after 5 seconds
+        setTimeout(() => {
+          setHintArrow(null);
+        }, 5000);
+      }
+    }
+  }, [bestMoves]);
+
   // Reset game
   const resetGame = () => {
     setGame(new Chess());
     setArrows([]);
+    setHintArrow(null);
     setCoachComment(null);
     setCustomSquareStyles({});
+    setShowBlunderPopup(false);
     previousEvalRef.current = null;
     previousGameRef.current = null;
   };
@@ -157,15 +266,18 @@ function App() {
       <div className="app-container">
         {/* Main Board Area */}
         <div className="board-container">
-          <div className="board-wrapper">
-            <Chessboard
-              position={game.fen()}
-              onPieceDrop={onDrop}
-              boardOrientation={boardOrientation}
-              customArrows={arrows}
-              customSquareStyles={customSquareStyles}
-              boardWidth={600}
-            />
+          <div className="board-layout">
+            <EvaluationBar evaluation={evaluation} />
+            <div className="board-wrapper">
+              <Chessboard
+                position={game.fen()}
+                onPieceDrop={onDrop}
+                boardOrientation={boardOrientation}
+                customArrows={hintArrow ? [...arrows, hintArrow] : arrows}
+                customSquareStyles={customSquareStyles}
+                boardWidth={600}
+              />
+            </div>
           </div>
           
           <div className="board-controls">
@@ -183,6 +295,13 @@ function App() {
               className={`control-button ${threatMode ? 'active' : ''}`}
             >
               {threatMode ? '🔴 Threat Mode ON' : '⚪ Threat Mode OFF'}
+            </button>
+            <button 
+              onClick={showHint}
+              className="control-button hint-button"
+              disabled={!bestMoves || bestMoves.length === 0 || isAnalyzing}
+            >
+              💡 Show Hint
             </button>
           </div>
         </div>
@@ -242,6 +361,11 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Blunder Popup */}
+      {showBlunderPopup && (
+        <BlunderPopup onClose={() => setShowBlunderPopup(false)} />
+      )}
     </div>
   );
 }

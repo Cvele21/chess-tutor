@@ -25,6 +25,12 @@
   gap: 20px;
 }
 
+.board-layout {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
 .board-wrapper {
   display: flex;
   justify-content: center;
@@ -69,6 +75,19 @@
 
 .control-button.active:hover {
   background: #22c55e;
+}
+
+.control-button.hint-button {
+  background: #3a3a3a;
+}
+
+.control-button.hint-button:hover:not(:disabled) {
+  background: #4a4a4a;
+}
+
+.control-button.hint-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .sidebar {
