@@ -1,0 +1,114 @@
+.tutor-feedback {
+  padding: 20px;
+  background: #2a2a2a;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.tutor-feedback h3 {
+  margin-bottom: 20px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.evaluation-section {
+  margin-bottom: 24px;
+}
+
+.evaluation-label {
+  font-size: 12px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.evaluation-value {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-block;
+}
+
+.evaluation-value.positive {
+  color: #4ade80;
+}
+
+.evaluation-value.negative {
+  color: #f87171;
+}
+
+.evaluation-value.equal {
+  color: #94a3b8;
+}
+
+.evaluation-value.mate {
+  color: #fbbf24;
+}
+
+.evaluation-value:hover {
+  transform: scale(1.05);
+}
+
+.evaluation-subtitle {
+  font-size: 11px;
+  color: #777;
+}
+
+.best-moves-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #3a3a3a;
+}
+
+.best-moves-label {
+  font-size: 12px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.best-moves-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.best-move-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background: #333;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 12px;
+}
+
+.best-move-item:hover {
+  background: #3a3a3a;
+  transform: translateX(4px);
+}
+
+.move-rank {
+  color: #888;
+  font-weight: 600;
+  min-width: 20px;
+}
+
+.move-notation {
+  flex: 1;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.move-score {
+  color: #4ade80;
+  font-weight: 600;
+  font-size: 14px;
+}
