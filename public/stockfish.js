@@ -16,7 +16,8 @@ try {
       const message = event.data || event;
       
       if (typeof message === 'string') {
-        // Forward all messages to main thread
+        // Forward all messages to main thread with current searchId
+        // Note: searchId is set when evaluate request is received
         self.postMessage({ 
           type: 'message', 
           data: message, 
@@ -60,7 +61,9 @@ self.onmessage = (event) => {
 
     case 'evaluate':
       if (isReady) {
+        // Increment searchId BEFORE starting search so all messages from this search have the same ID
         currentSearchId++;
+        const thisSearchId = currentSearchId;
         
         // Stop any previous search
         stockfish.postMessage('stop');
@@ -69,7 +72,7 @@ self.onmessage = (event) => {
         const posCommand = position || 'startpos';
         stockfish.postMessage(`position ${posCommand}`);
         
-        // Start search
+        // Start search - all messages from this search will have thisSearchId
         const depthValue = depth || 15;
         stockfish.postMessage(`go depth ${depthValue}`);
       } else {

@@ -113,8 +113,10 @@ function App() {
         const evaluationChange = evaluation - previousEvalRef.current;
         
         // Blunder detection: Check if score dropped by more than 1.5 pawns (150 centipawns)
-        const isWhiteTurn = previousGameRef.current.turn() === 'w';
-        const justMoved = isWhiteTurn ? 'white' : 'black';
+        // Use game.turn() (current state after move) to determine who just moved
+        // If it's now white's turn, black just moved (and vice versa)
+        const isWhiteTurn = game.turn() === 'w';
+        const justMoved = isWhiteTurn ? 'black' : 'white';
         const perspective = justMoved === 'white' ? 1 : -1;
         const adjustedChange = evaluationChange * perspective;
         
@@ -138,10 +140,12 @@ function App() {
         }
       }
       
-      // Update previous evaluation and game state for next comparison
-      // This happens after we've used the previous values
-      previousEvalRef.current = evaluation;
-      previousGameRef.current = new Chess(game.fen());
+      // Only update previous evaluation and game state when game actually changed
+      // This prevents corruption of the baseline when evaluation updates multiple times for the same position
+      if (gameChanged) {
+        previousEvalRef.current = evaluation;
+        previousGameRef.current = new Chess(game.fen());
+      }
     }
   }, [evaluation, game, isAnalyzing]);
 
